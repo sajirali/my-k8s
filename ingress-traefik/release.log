@@ -1,0 +1,59 @@
+LAST DEPLOYED: Thu Sep 12 11:16:16 2019
+NAMESPACE: kube-system
+STATUS: DEPLOYED
+
+RESOURCES:
+==> v1/ClusterRole
+NAME                        AGE
+traefik-ingress-controller  6m35s
+
+==> v1/ClusterRoleBinding
+NAME                        AGE
+traefik-ingress-controller  6m35s
+
+==> v1/ConfigMap
+NAME                             DATA  AGE
+traefik-ingress-controller       1     6m35s
+traefik-ingress-controller-test  1     6m35s
+
+==> v1/Deployment
+NAME                        READY  UP-TO-DATE  AVAILABLE  AGE
+traefik-ingress-controller  1/1    1           1          6m35s
+
+==> v1/Pod(related)
+NAME                                         READY  STATUS   RESTARTS  AGE
+traefik-ingress-controller-7bdbc9ccd6-wc82p  1/1    Running  0         6m35s
+
+==> v1/Service
+NAME                                  TYPE          CLUSTER-IP      EXTERNAL-IP  PORT(S)                     AGE
+traefik-ingress-controller            LoadBalancer  10.100.130.129  <pending>    80:30828/TCP,443:31306/TCP  6m35s
+traefik-ingress-controller-dashboard  ClusterIP     10.100.34.134   <none>       80/TCP                      6m35s
+
+==> v1/ServiceAccount
+NAME                        SECRETS  AGE
+traefik-ingress-controller  1        6m35s
+
+==> v1beta1/Ingress
+NAME                                  HOSTS                ADDRESS           PORTS  AGE
+traefik-ingress-controller-dashboard  traefik.example.com  a648d7382d4e1...  80     6m35s
+
+==> v2beta1/HorizontalPodAutoscaler
+NAME                        REFERENCE                              TARGETS                       MINPODS  MAXPODS  REPLICAS  AGE
+traefik-ingress-controller  Deployment/traefik-ingress-controller  <unknown>/60%, <unknown>/60%  1        10       1         6m35s
+
+
+NOTES:
+
+1. Get Traefik's load balancer IP/hostname:
+
+     NOTE: It may take a few minutes for this to become available.
+
+     You can watch the status by running:
+
+         $ kubectl get svc traefik-ingress-controller --namespace kube-system -w
+
+     Once 'EXTERNAL-IP' is no longer '<pending>':
+
+         $ kubectl describe svc traefik-ingress-controller --namespace kube-system | grep Ingress | awk '{print $3}'
+
+2. Configure DNS records corresponding to Kubernetes ingress resources to point to the load balancer IP/hostname found in step 1

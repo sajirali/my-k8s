@@ -1,0 +1,344 @@
+---
+# Source: traefik/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: release-name-traefik
+  labels:
+    app: traefik
+    chart: traefik-1.77.4
+    release: "release-name"
+    heritage: "Tiller"
+data:
+  traefik.toml: |
+    # traefik.toml
+    logLevel = "info"
+    defaultEntryPoints = ["http", "httpn"]
+    [entryPoints]
+      [entryPoints.http]
+      address = ":80"
+      compress = true
+      [entryPoints.httpn]
+      address = ":8880"
+      compress = true
+      [entryPoints.traefik]
+      address = ":8080"
+    [ping]
+    entryPoint = "http"
+    [kubernetes]
+    namespaces = ["default", "kube-system"]
+    [traefikLog]
+      format = "json"
+    [api]
+      entryPoint = "traefik"
+      dashboard = true
+
+---
+# Source: traefik/templates/tests/test-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: release-name-traefik-test
+  labels:
+    app: release-name-traefik
+    chart: traefik-1.77.4
+    heritage: "Tiller"
+    release: "release-name"
+data:
+  run.sh: |-
+    @test "Test Access" {
+      curl -D - http://release-name-traefik/
+    }
+
+---
+# Source: traefik/templates/rbac.yaml
+
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: release-name-traefik
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: release-name-traefik
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - services
+      - endpoints
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+    resources:
+      - ingresses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - extensions
+    resources:
+      - ingresses/status
+    verbs:
+      - update
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: release-name-traefik
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: release-name-traefik
+subjects:
+  - kind: ServiceAccount
+    name: release-name-traefik
+    namespace: kube-system
+
+---
+# Source: traefik/templates/dashboard-service.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: release-name-traefik-dashboard
+  labels:
+    app: traefik
+    chart: traefik-1.77.4
+    release: "release-name"
+    heritage: "Tiller"
+  annotations:
+spec:
+  type: ClusterIP
+  selector:
+    app: traefik
+    release: release-name
+  ports:
+    - name: dashboard-http
+      port: 80
+      targetPort: 8080
+
+---
+# Source: traefik/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: release-name-traefik
+  labels:
+    app: traefik
+    chart: traefik-1.77.4
+    release: "release-name"
+    heritage: "Tiller"
+  annotations:
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
+  selector:
+    app: traefik
+    release: release-name
+  ports:
+    - port: 80
+      name: http
+      targetPort: http
+    - port: 443
+      name: https
+      targetPort: httpn
+
+---
+# Source: traefik/templates/tests/test.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: release-name-traefik-test
+  labels:
+    app: release-name-traefik
+    chart: traefik-1.77.4
+    heritage: "Tiller"
+    release: "release-name"
+  annotations:
+    "helm.sh/hook": test-success
+spec:
+  initContainers:
+    - name: test-framework
+      image: "dduportal/bats:0.4.0"
+      command:
+        - "bash"
+        - "-c"
+        - |
+          set -ex
+          # copy bats to tools dir
+          cp -R /usr/local/libexec/ /tools/bats/
+      volumeMounts:
+        - mountPath: /tools
+          name: tools
+  containers:
+    - name: release-name-test
+      image: "dduportal/bats:0.4.0"
+      command: ["/tools/bats/bats", "-t", "/tests/run.sh"]
+      volumeMounts:
+        - mountPath: /tests
+          name: tests
+          readOnly: true
+        - mountPath: /tools
+          name: tools
+  volumes:
+    - name: tests
+      configMap:
+        name: release-name-traefik-test
+    - name: tools
+      emptyDir: {}
+  restartPolicy: Never
+
+---
+# Source: traefik/templates/deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: release-name-traefik
+  labels:
+    app: traefik
+    chart: traefik-1.77.4
+    release: "release-name"
+    heritage: "Tiller"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: traefik
+      release: release-name
+  template:
+    metadata:
+      annotations:
+        checksum/config: d9c593649ff5ee75fdb1d8a67d32077fe3a22fcfb813685f49fc25527181d392
+      labels:
+        app: traefik
+        chart: traefik-1.77.4
+        release: "release-name"
+        heritage: "Tiller"
+    spec:
+      serviceAccountName: release-name-traefik
+      terminationGracePeriodSeconds: 60
+      containers:
+        - image: traefik:1.7.14
+          name: release-name-traefik
+          resources: {}
+
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: 80
+            failureThreshold: 1
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: 80
+            failureThreshold: 3
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 2
+          volumeMounts:
+            - mountPath: /config
+              name: config
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+            - name: httpn
+              containerPort: 8880
+              protocol: TCP
+            - name: https
+              containerPort: 443
+              protocol: TCP
+            - name: dash
+              containerPort: 8080
+              protocol: TCP
+          args:
+            - --configfile=/config/traefik.toml
+
+      volumes:
+        - name: config
+          configMap:
+            name: release-name-traefik
+
+---
+# Source: traefik/templates/dashboard-ingress.yaml
+
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: release-name-traefik-dashboard
+  labels:
+    app: traefik
+    chart: traefik-1.77.4
+    release: "release-name"
+    heritage: "Tiller"
+  annotations:
+spec:
+  rules:
+    - host: traefik.onica-umg.onica-dev.com
+      http:
+        paths:
+          - backend:
+              serviceName: release-name-traefik-dashboard
+              servicePort: dashboard-http
+
+---
+# Source: traefik/templates/hpa.yaml
+
+apiVersion: autoscaling/v2beta1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: release-name-traefik
+  labels:
+    app: traefik
+    chart: traefik-1.77.4
+    release: "release-name"
+    heritage: "Tiller"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: release-name-traefik
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    - resource:
+        name: cpu
+        targetAverageUtilization: 60
+      type: Resource
+    - resource:
+        name: memory
+        targetAverageUtilization: 60
+      type: Resource
+
+---
+# Source: traefik/templates/acme-pvc.yaml
+---
+# Source: traefik/templates/client-ca-configmap.yaml
+---
+# Source: traefik/templates/config-files.yaml
+---
+# Source: traefik/templates/default-cert-secret.yaml
+---
+# Source: traefik/templates/dns-provider-secret.yaml
+---
+# Source: traefik/templates/poddisruptionbudget.yaml
+---
+# Source: traefik/templates/secret-files.yaml
+---
+# Source: traefik/templates/servicemonitor.yaml
+---
+# Source: traefik/templates/storeconfig-job.yaml
