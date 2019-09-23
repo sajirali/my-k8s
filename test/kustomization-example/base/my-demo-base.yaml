@@ -1,0 +1,93 @@
+---
+# Source: my-demo-chart/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-demo-my-demo-chart
+  labels:
+    app.kubernetes.io/name: my-demo-chart
+    helm.sh/chart: my-demo-chart-0.1.0
+    app.kubernetes.io/instance: my-demo
+    app.kubernetes.io/version: "1.0"
+    app.kubernetes.io/managed-by: Tiller
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: my-demo-chart
+    app.kubernetes.io/instance: my-demo
+
+---
+# Source: my-demo-chart/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "my-demo-my-demo-chart-test-connection"
+  labels:
+    app.kubernetes.io/name: my-demo-chart
+    helm.sh/chart: my-demo-chart-0.1.0
+    app.kubernetes.io/instance: my-demo
+    app.kubernetes.io/version: "1.0"
+    app.kubernetes.io/managed-by: Tiller
+  annotations:
+    "helm.sh/hook": test-success
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args:  ['my-demo-my-demo-chart:80']
+  restartPolicy: Never
+
+---
+# Source: my-demo-chart/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: my-demo-my-demo-chart
+  labels:
+    app.kubernetes.io/name: my-demo-chart
+    helm.sh/chart: my-demo-chart-0.1.0
+    app.kubernetes.io/instance: my-demo
+    app.kubernetes.io/version: "1.0"
+    app.kubernetes.io/managed-by: Tiller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: my-demo-chart
+      app.kubernetes.io/instance: my-demo
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: my-demo-chart
+        app.kubernetes.io/instance: my-demo
+    spec:
+      containers:
+        - name: my-demo-chart
+          image: "nginx:stable"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            {}
+            
+
+---
+# Source: my-demo-chart/templates/ingress.yaml
+
+

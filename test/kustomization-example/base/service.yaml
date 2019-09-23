@@ -1,0 +1,23 @@
+---
+# Source: my-demo-chart/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-demo-my-demo-chart
+  labels:
+    app.kubernetes.io/name: my-demo-chart
+    helm.sh/chart: my-demo-chart-0.1.0
+    app.kubernetes.io/instance: my-demo
+    app.kubernetes.io/version: "1.0"
+    app.kubernetes.io/managed-by: Tiller
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: my-demo-chart
+    app.kubernetes.io/instance: my-demo
+
